@@ -103,11 +103,11 @@ function init() {
         transparent: true,
         blending: THREE.AdditiveBlending, // Hace que los colores se sumen
         depthWrite: false, // Para que no interfiera con la profundidad de otros objetos
-        opacity: 0.7 // Ajusta la opacidad
+        opacity: 0.4 // Ajusta la opacidad
     });
 
     const sunGlow = new THREE.Sprite(flareMaterial);
-    sunGlow.scale.set(40, 40, 0.2); 
+    sunGlow.scale.set(10, 10, 0.2); 
     sun.add(sunGlow); // como hijo del sol para que se mueva con él
 
     // Crear planetas
