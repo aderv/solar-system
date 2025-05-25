@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Solar 3D</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="info">
+        Sistema Solar Interactivo
+        <div id="controls">
+            <label for="speed-slider">Velocidad de simulación:</label>
+            <input type="range" id="speed-slider" min="0" max="100" value="1" step="0.1">
+            <span id="speed-value">1.0x</span>
+            <br> 
+            <label for="scale-slider">Escala de Planetas:</label>
+            <input type="range" id="scale-slider" min="1" max="50" value="10" step="1">
+            <span id="scale-value">1x</span>
+        </div>
+    </div>
+    <div id="loading-screen">Cargando texturas...</div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>
