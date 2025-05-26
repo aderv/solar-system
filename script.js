@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-let scene, camera, renderer, controls;
+let scene, camera, renderer, controls, composer;
 let sun, planets = [];
 let timeScale = 1.0;
 const clock = new THREE.Clock();
@@ -9,6 +9,11 @@ const sunRadius = 3;
 const earthSunProportion = 0.00915768;
 const UA = 10;
 let planetScaleMultiplier = 10;
+
+// Variables para el audio
+let audioListener, backgroundMusic;
+let musicVolume = 0.5; // Volumen inicial, debe coincidir con el slider
+let isMusicPlaying = false; // Estado de la música
 
 // Velocidades orbitales son relativas y aproximadas
 const planetData = [
@@ -67,6 +72,37 @@ function init() {
     renderer.shadowMap.enabled = true; // Habilitar sombras
     document.body.appendChild(renderer.domElement);
     renderer.outputColorSpace = THREE.SRGBColorSpace;   
+
+    // 1. Crear AudioListener y añadirlo a la cámara
+    audioListener = new THREE.AudioListener();
+    camera.add(audioListener); // El listener "escucha" desde la posición de la cámara
+
+    // 2. Crear el objeto Audio para la música de fondo
+    backgroundMusic = new THREE.Audio(audioListener);
+
+    // 3. Cargar el archivo de audio
+    const audioLoader = new THREE.AudioLoader(loadingManager); // loadingManager existente
+    audioLoader.load(
+        'sound.mp3', // Ruta 
+        function(buffer) {
+            // Callback cuando el audio se carga exitosamente
+            backgroundMusic.setBuffer(buffer);
+            backgroundMusic.setLoop(true); // Para que se reproduzca en bucle
+            backgroundMusic.setVolume(musicVolume); // Establecer volumen inicial
+            console.log("Música de fondo cargada.");
+            // No reproducir automáticamente aquí debido a las políticas del navegador.
+            // Se reproducirá al hacer clic en el botón.
+        },
+        function(xhr) {
+            // Callback de progreso (opcional)
+            console.log((xhr.loaded / xhr.total * 100) + '% cargado de música');
+        },
+        function(err) {
+            // Callback de error
+            console.error('Error al cargar la música de fondo:', err);
+        }
+    );
+
     
     // Controles de órbita (zoom, pan, rotate)
     controls = new OrbitControls(camera, renderer.domElement);
@@ -254,9 +290,46 @@ function init() {
         scaleValueDisplay.textContent = `${planetScaleMultiplier.toFixed(0)}x`;
         updatePlanetScales(); // Llamar a la función que actualiza las escalas
     });
+
+    // Control de Volumen de Música
+    const volumeSlider = document.getElementById('volume-slider');
+    const volumeValueDisplay = document.getElementById('volume-value');
+    const playPauseButton = document.getElementById('play-pause-button');
+
+    volumeSlider.value = musicVolume; // Sincronizar slider
+    volumeValueDisplay.textContent = `${Math.round(musicVolume * 100)}%`;
+
+    volumeSlider.addEventListener('input', (event) => {
+        musicVolume = parseFloat(event.target.value);
+        volumeValueDisplay.textContent = `${Math.round(musicVolume * 100)}%`;
+        if (backgroundMusic) {
+            backgroundMusic.setVolume(musicVolume);
+        }
+    });
+
+    playPauseButton.addEventListener('click', () => {
+        if (!backgroundMusic || !backgroundMusic.buffer) {
+            console.log("La música aún no está cargada o hubo un error.");
+            return;
+        }
+
+        if (isMusicPlaying) {
+            backgroundMusic.pause();
+            playPauseButton.textContent = 'Reproducir';
+        } else {
+            // Intentar reproducir. El navegador puede bloquearlo si no hay interacción previa.
+            // El AudioContext a menudo necesita ser "desbloqueado" por una acción del usuario.
+            if (audioListener.context.state === 'suspended') {
+                audioListener.context.resume();
+            }
+            backgroundMusic.play();
+            playPauseButton.textContent = 'Pausar';
+        }
+        isMusicPlaying = !isMusicPlaying;
+    });
 }
 
-// Nueva función para actualizar las escalas de los planetas
+// Actualizar las escalas de los planetas
 function updatePlanetScales() {
     planets.forEach(planet => {
         const baseRadius = planet.mesh.userData.baseRadius;
