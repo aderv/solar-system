@@ -13,11 +13,13 @@ body {
     background-color: rgba(0, 0, 0, 0.5);
     padding: 10px;
     border-radius: 5px;
-    z-index: 100;
+    z-index: 1000;
+    color: white;
 }
 
 #controls {
     margin-top: 10px;
+    z-index: 1000;
 }
 
 #controls label {
@@ -26,6 +28,7 @@ body {
 
 #speed-slider {
     vertical-align: middle;
+    z-index: 2000;
 }
 
 #loading-screen {

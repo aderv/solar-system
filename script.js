@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-let scene, camera, renderer, controls, composer;
+let scene, camera, renderer, controls;
 let sun, planets = [];
 let timeScale = 1.0;
 const clock = new THREE.Clock();
@@ -9,11 +9,82 @@ const sunRadius = 3;
 const earthSunProportion = 0.00915768;
 const UA = 10;
 let planetScaleMultiplier = 10;
-
+// Variables para el movimiento de la cámara
+let focusedPlanet = null; // Almacena el planeta actualmente enfocado, o null
+let previousCameraPosition = new THREE.Vector3(); // Para guardar la posición de la cámara antes de enfocar
+let previousCameraTarget = new THREE.Vector3();   // Para guardar el target de OrbitControls
+const cameraOffset = new THREE.Vector3(4, 10, 20); // Desplazamiento de la cámara relativo al planeta
+let isCameraFocused = false; // para saber si la cámara está enfocada en un planeta
 // Variables para el audio
 let audioListener, backgroundMusic;
 let musicVolume = 0.5; // Volumen inicial, debe coincidir con el slider
 let isMusicPlaying = false; // Estado de la música
+
+// movimiento de la cámara
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function onDocumentMouseDown(event) {
+    event.preventDefault();
+    // Calcula la posición del mouse en coordenadas normalizadas del dispositivo (-1 a +1)
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    // Actualiza el raycaster con la cámara y la posición del mouse
+    raycaster.setFromCamera(mouse, camera);
+    // Calcula los objetos que intersectan el rayo. Solo nos interesan los meshes de los planetas
+    const planetMeshes = planets.map(p => p.mesh);
+    const intersects = raycaster.intersectObjects(planetMeshes);
+
+    if (intersects.length > 0) {
+        // Hubo un clic en un planeta
+        const clickedObject = intersects[0].object; // El primer objeto intersectado es el más cercano
+        // Buscar el objeto planeta correspondiente al mesh clickeado
+        const targetPlanet = planets.find(p => p.mesh === clickedObject);
+        if (targetPlanet) {
+            if (focusedPlanet === targetPlanet) { // Si ya estaba enfocado en este planeta, desenfocar
+                unfocusCamera();
+            } else {
+                focusOnPlanet(targetPlanet);
+            }
+        }
+    } else {
+        // Hubo un clic fuera de cualquier planeta
+        if (isCameraFocused) {
+            unfocusCamera();
+        }
+    }
+}
+
+// Añadir el event listener en init()
+// window.addEventListener('mousedown', onDocumentMouseDown, false); // O 'click'
+window.addEventListener('pointerdown', onDocumentMouseDown, false);
+
+// Cambio del estado de la cámara
+function focusOnPlanet(planet) {
+    focusedPlanet = planet;
+    isCameraFocused = true;    
+    controls.enabled = false; // Deshabilitar OrbitControls para que no interfiera con el seguimiento
+    // Guardar la posición y el objetivo actuales de la cámara/controles
+    // para poder restaurarlos después.
+    previousCameraPosition.copy(camera.position);
+    previousCameraTarget.copy(controls.target); // Guardar el punto donde miraban los OrbitControls
+    // para que se actualice en cada frame mientras sigue al planeta.
+    console.log("Enfocando en:", planet.name);
+}
+
+function unfocusCamera() {
+    if (!isCameraFocused) return; // Ya está desenfocada
+    focusedPlanet = null;
+    isCameraFocused = false;    
+    controls.enabled = true; // Restaurar OrbitControls
+    // Restaurar la posición de la cámara y el objetivo de OrbitControls.
+    // Para una transición suave aquí se puede usar GSAP o TWEEN.js
+    camera.position.copy(previousCameraPosition);
+    controls.target.copy(previousCameraTarget);
+    controls.update(); // Para que OrbitControls tome los nuevos valores
+    console.log("Cámara desenfocada, control del usuario restaurado.");
+}
+
 
 // Velocidades orbitales son relativas y aproximadas
 const planetData = [
@@ -276,8 +347,12 @@ function init() {
     speedSlider.value = timeScale; // Sincronizar slider con valor inicial
     speedValueDisplay.textContent = `${timeScale.toFixed(1)}x`;
     speedSlider.addEventListener('input', (event) => {
+        console.log("Control de velocidad en funcionamiento");
         timeScale = parseFloat(event.target.value);
         speedValueDisplay.textContent = `${timeScale.toFixed(1)}x`;
+    });
+    speedSlider.addEventListener('pointerdown', function(event) { 
+        event.stopPropagation();
     });
 
     // Control de Escala de Planetas
@@ -286,10 +361,14 @@ function init() {
     scaleSlider.value = planetScaleMultiplier; // Sincronizar slider con valor inicial
     scaleValueDisplay.textContent = `${planetScaleMultiplier.toFixed(0)}x`; // Usar toFixed(0) para enteros
     scaleSlider.addEventListener('input', (event) => {
+        console.log("Control de escala funcionando");
         planetScaleMultiplier = parseFloat(event.target.value);
         scaleValueDisplay.textContent = `${planetScaleMultiplier.toFixed(0)}x`;
         updatePlanetScales(); // Llamar a la función que actualiza las escalas
     });
+    scaleSlider.addEventListener('pointerdown', function(event){
+        event.stopPropagation();
+    })
 
     // Control de Volumen de Música
     const volumeSlider = document.getElementById('volume-slider');
@@ -300,11 +379,15 @@ function init() {
     volumeValueDisplay.textContent = `${Math.round(musicVolume * 100)}%`;
 
     volumeSlider.addEventListener('input', (event) => {
+        console.log("Control de volumen funcionando");
         musicVolume = parseFloat(event.target.value);
         volumeValueDisplay.textContent = `${Math.round(musicVolume * 100)}%`;
         if (backgroundMusic) {
             backgroundMusic.setVolume(musicVolume);
         }
+    });
+    volumeSlider.addEventListener('pointerdown', function(event) { 
+        event.stopPropagation();
     });
 
     playPauseButton.addEventListener('click', () => {
@@ -327,6 +410,9 @@ function init() {
         }
         isMusicPlaying = !isMusicPlaying;
     });
+    playPauseButton.addEventListener('pointerdown', function(event) { 
+        event.stopPropagation();
+    });
 }
 
 // Actualizar las escalas de los planetas
@@ -335,12 +421,6 @@ function updatePlanetScales() {
         const baseRadius = planet.mesh.userData.baseRadius;
         const newScale = baseRadius * planetScaleMultiplier;
         planet.mesh.scale.set(newScale, newScale, newScale);
-
-        // Si los anillos de Saturno no escalan automáticamente como hijos,
-        // necesitarías re-escalarlos aquí también, o reconstruir su geometría
-        // si sus radios se definieron absolutamente.
-        // Pero como los hicimos hijos del planetMesh y sus geometrías son relativas al radio base,
-        // el escalado del planetMesh debería encargarse de los anillos.
     });
 }
 
@@ -356,7 +436,7 @@ function animate() {
     const delta = clock.getDelta(); // Tiempo transcurrido desde el último frame
 
     // Actualizar controles de órbita
-    controls.update();
+    if (controls.enabled) controls.update();
 
     // Rotación del Sol sobre sí mismo (lento)
     sun.rotation.y += 0.001 * timeScale * delta * 60; // el delta * 60 es para normalizar si delta es pequeño
@@ -379,12 +459,46 @@ function animate() {
         // Podrías añadir una rotación diferencial si quisieras.
     });
 
+    sun.rotation.y += 0.001 * timeScale * delta * 60;
+
+    if (isCameraFocused && focusedPlanet) {
+
+        const planetWorldPosition = new THREE.Vector3();
+        focusedPlanet.mesh.getWorldPosition(planetWorldPosition);
+
+        const sunWorldPosition = new THREE.Vector3();
+        sun.getWorldPosition(sunWorldPosition);
+
+        // 1. Calcular la dirección del Sol al Planeta
+        const dirSunToPlanet = new THREE.Vector3().subVectors(planetWorldPosition, sunWorldPosition).normalize();
+
+        // Posición base: la del planeta
+        let desiredCameraPosition = planetWorldPosition.clone();
+
+        // Añadir el offset "detrás" del planeta (en la dirección opuesta a la que va del planeta al sol)        
+        desiredCameraPosition.addScaledVector(dirSunToPlanet, cameraOffset.z); 
+        // Añadir el offset de altura en el eje Y
+        desiredCameraPosition.y += cameraOffset.y;
+
+        // Añadir un offset lateral
+        // Para un offset lateral simple, podemos calcular un vector "derecha"
+        if (cameraOffset.x !== 0) {
+            const upVector = new THREE.Vector3(0, 1, 0); // Asumimos Y como arriba global
+            const lateralOffsetVector = new THREE.Vector3().crossVectors(dirSunToPlanet, upVector).normalize();
+            desiredCameraPosition.addScaledVector(lateralOffsetVector, cameraOffset.x);
+        }
+
+        // Interpolar suavemente la posición de la cámara
+        camera.position.lerp(desiredCameraPosition, 0.1);
+
+        // Hacer que la cámara mire al Sol (esto ya lo tenías y es correcto para el objetivo)
+        camera.lookAt(sunWorldPosition);
+    } 
+
     renderer.render(scene, camera);
     
 }
 
 
 // LLAMADAS PARA INICIAR
-init(); // ¡Llama a init() aquí para que comience la carga de texturas y la configuración de la escena!
-
-// El manejador de redimensionamiento y el control de velocidad ya están dentro de init o son globales.
+init(); // 
